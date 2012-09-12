@@ -3,7 +3,8 @@ var express = require('express'),
 	request = require('request'),
 	jsdom = require('jsdom'),
 	nurl = require('url'),
-	icalendar = require('./node-icalendar');
+	icalendar = require('./node-icalendar'),
+	crypto = require('crypto');
 
 app.use(express.bodyParser());
 
@@ -18,6 +19,7 @@ app.get('/', function(req, res) {
 				jsdom.env(body, ['http://code.jquery.com/jquery-1.8.1.min.js'], function (errors, window) {
 					var tds = window.$('td');
 					var cnt = 0, cnt2 = 0;
+					var datesAdded = {};
 					tds.each(function() {
 						if (window.$('a', this).length == 2) {
 							var title = window.$(window.$('a strong', this)[0]).text();
@@ -25,7 +27,16 @@ app.get('/', function(req, res) {
 							var chunks = window.$(this).html().split('<br />');
 							var type = window.$.trim(chunks[2]);
 							var time = window.$.trim(chunks[3]);
+
 							var location = window.$.trim(chunks[4]);
+							if (location.indexOf(',') !== -1) {
+								chunks.splice(0,5);
+								for (var i = 0; i < chunks.length; i++) {
+									chunks[i] = window.$.trim(chunks[i]).replace(',', '');
+								}
+								location = chunks.join(', ');
+							}
+
 							var link = protocol + '//' + host + window.$(window.$('a', this)[0]).attr('href');
 
 							jsdom.env(link, ['http://code.jquery.com/jquery-1.8.1.min.js'], function (errors, window) {
@@ -34,7 +45,11 @@ app.get('/', function(req, res) {
 									var cont = window.$.trim(window.$(this).text());
 									var timestart = time.split('-')[0];
 									var timeend = time.split('-')[1];
-									if (cont.indexOf(type !== -1) && cont.indexOf(location) !== -1 && cont.indexOf(timestart) !== -1) {
+									var location_p = location;
+									if (location_p.indexOf(',') !== -1) {
+										location_p = location_p.split(',')[0];
+									}
+									if (cont.indexOf(type !== -1) && cont.indexOf(location_p) !== -1 && cont.indexOf(timestart) !== -1) {
 										if (cont.indexOf('Montags') !== -1) {
 											day = 0;
 										}
@@ -50,18 +65,16 @@ app.get('/', function(req, res) {
 										if (cont.indexOf('Freitags') !== -1) {
 											day = 4;
 										}
-										if (day) {
+										var hash = crypto.createHash('md5').update(link + time + day).digest('hex');
+										if (day !== undefined && datesAdded[hash] === undefined) {
+											datesAdded[hash] = true;
 											var event = ical.addComponent('VEVENT');
-											event.setSummary(title + '(' + type + ')');
+											event.setSummary(title + ' (' + type + ')');
 											event.setDescription('bei ' + prof);
 											event.setUrl(link);
 											event.setLocation(location);
-											var hours = timeend.split(':')[0] - timestart.split(':')[0];
-											var minutes = 60 - timeend.split(':')[1] - timestart.split(':')[1];
-											console.log(timeend.split(':')[1], timestart.split(':')[1]);
-											console.log(hours, minutes);
-											event.setDate(new Date(2012, 9, day + 1, timestart.split(':')[0], timestart.split(':')[1], 0), 60 * ((60 * hours) + minutes));
-											console.log(title, type, location, link, day);
+											event.setDate(new Date(2012, 9, day + 1, timestart.split(':')[0], timestart.split(':')[1], 0), new Date(2012, 9, day + 1, timeend.split(':')[0], timeend.split(':')[1], 0));
+											//console.log(title, type, location, link, day);
 										}
 									}
 								});
