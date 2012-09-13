@@ -1,19 +1,25 @@
-var express = require('express'),
-	app = express(),
-	request = require('request'),
-	jsdom = require('jsdom'),
-	nurl = require('url'),
-	icalendar = require('./node-icalendar'),
-	crypto = require('crypto');
+var express					= require('express'),
+	app						= express(),
+	request					= require('request'),
+	jsdom					= require('jsdom'),
+	nurl					= require('url'),
+	icalendar				= require('./node-icalendar'),
+	crypto					= require('crypto'),
+	application_root		= __dirname,
+	path					= require('path'),
+	pub_dir					= path.join(application_root, './static'),
+	fs						= require('fs');
 
 app.use(express.bodyParser());
+app.use(express.static(pub_dir));
 
-app.get('/', function(req, res) {
-	if (req.query.url) {
+app.get('/tt', function(req, res) {
+	if (req.query.url && req.query.url.match(/https\:\/\/www\.(ei|ai)\.rub\.de\/studium\/(its|ai)\/(bachelor|master)\/po09\/stundenplaene\/([1-6]).semester\//)) {
 		var url = req.query.url;
 		var host = nurl.parse(url).host;
 		var protocol = nurl.parse(url).protocol;
 		var ical = new icalendar.iCalendar();
+		var recurDays = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 		request(url, function (error, response, body) {
 			if (!error && response.statusCode == 200) {
 				jsdom.env(body, ['http://code.jquery.com/jquery-1.8.1.min.js'], function (errors, window) {
@@ -73,14 +79,27 @@ app.get('/', function(req, res) {
 											event.setDescription('bei ' + prof);
 											event.setUrl(link);
 											event.setLocation(location);
-											event.setDate(new Date(2012, 9, day + 1, timestart.split(':')[0], timestart.split(':')[1], 0), new Date(2012, 9, day + 1, timeend.split(':')[0], timeend.split(':')[1], 0));
+											event.setRecurWeekly(recurDays[day], new Date(2013, 1, 1, timestart.split(':')[0], timestart.split(':')[1], 0));
+											event.setDate(new Date(2012, 9, day + 1 + 7, timestart.split(':')[0], timestart.split(':')[1], 0), new Date(2012, 9, day + 1 + 7, timeend.split(':')[0], timeend.split(':')[1], 0));
 											//console.log(title, type, location, link, day);
 										}
 									}
 								});
 								cnt2++;
 								if (cnt2 === cnt) {
-									console.log(ical.toString());
+									var hash = crypto.createHash('md5').update(url).digest('hex');
+									var dir = path.join(pub_dir, './ics/' + hash);
+									var filename = path.join(dir, './rubcalendar.ics');
+									var puburl = './ics/' + hash + '/rubcalendar.ics';
+									fs.mkdir(dir, function () {
+										fs.writeFile(filename, ical.toString(), function (err) {
+											if (err) {
+												console.log(err);
+											} else {
+												res.send(puburl);
+											}
+										});
+									});
 								}
 							});
 							cnt++;
@@ -90,8 +109,9 @@ app.get('/', function(req, res) {
 			}
 
 		});
+	} else {
+		res.send(403, 'No valid URL given!');
 	}
-	res.send('hello world');
 });
 
 app.listen(3000);
