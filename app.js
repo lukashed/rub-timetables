@@ -80,7 +80,7 @@ app.get('/tt', function(req, res) {
 											event.setUrl(link);
 											event.setLocation(location);
 											event.setRecurWeekly(recurDays[day], new Date(2013, 1, 1, timestart.split(':')[0], timestart.split(':')[1], 0));
-											event.setDate(new Date(2012, 9, day + 1 + 7, timestart.split(':')[0], timestart.split(':')[1], 0), new Date(2012, 9, day + 1 + 7, timeend.split(':')[0], timeend.split(':')[1], 0));
+											event.setDate(new Date(2012, 9, day + 1 + 7, timestart.split(':')[0] - 2, timestart.split(':')[1], 0), new Date(2012, 9, day + 1 + 7, timeend.split(':')[0] - 2, timeend.split(':')[1], 0));
 											//console.log(title, type, location, link, day);
 										}
 									}
